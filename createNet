@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# The same Topology as CreateNet3
+#
+#                                                  --- [veth4] Router [veth5] ----- [veth6] Client
+#                                                 /
+#                                                /
+#										  [veth3]
+#     Client [veth1] ----- [veth2] Router 
+#                                         [veth7]
+#                                                \
+#                                                 \
+#                                                  --- [veth8] Router [veth9] ----- [veth10] Client
+#
+#
+
+echo "Clean any previous network"
+cleanNet ovs-bridge
+
+echo "Create new network"
+createOVSBridgedPair veth1 veth2 y ovs-bridge
+createOVSBridgedPair veth3 veth4 n ovs-bridge
+createOVSBridgedPair veth5 veth6 n ovs-bridge
+createOVSBridgedPair veth7 veth8 n ovs-bridge
+createOVSBridgedPair veth9 veth10 n ovs-bridge
+
+ifconfig veth1 192.168.1.1
+ifconfig veth2 192.168.1.2
+ifconfig veth3 192.168.1.3
+ifconfig veth4 192.168.1.4
+ifconfig veth5 192.168.1.5
+ifconfig veth6 192.168.1.6
+ifconfig veth7 192.168.1.7
+ifconfig veth8 192.168.1.8
+ifconfig veth9 192.168.1.9
+ifconfig veth10 192.168.1.10
