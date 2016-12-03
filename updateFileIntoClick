@@ -1,3 +1,6 @@
 #!/bin/bash
-cp *.cc ~/click/elements/local/ -u
-cp *.hh ./click/elements/local/ -u
+cp local/*.cc ~/click/elements/local/ -u
+cp local/*.hh ~/click/elements/local/ -u
+cd ~/click/
+make elemlist
+make
