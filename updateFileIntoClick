@@ -1,0 +1,3 @@
+#!/bin/bash
+cp *.cc ~/click/elements/local/ -u
+cp *.hh ./click/elements/local/ -u
