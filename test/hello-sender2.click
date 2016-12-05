@@ -10,6 +10,6 @@
 
 RatedSource(DATA "hello", RATE 1, LIMIT 10) 
 						-> Print(Raw)
-                        -> AddIPHeader
+                                                -> AddIPHeader(SOURCE_IP 1, DEST_IP 2)
 						-> Print(IP)
 						-> ToDevice(veth1)
