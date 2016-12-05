@@ -41,9 +41,6 @@ uint16_t SetIPHeader::GetIpChk(unsigned char *ptr, int size)
 
 Packet * SetIPHeader::simple_action(Packet *p){
     WritablePacket * q = p->push(IPHEADERSIZE);
-    if(!q){
-        q = Packet::make(p->length() + IPHEADERSIZE);
-    }
     ipheader * ip_header = (ipheader *)(q -> data());
     ip_header->initialize();
     ip_header->Protocol = (uint8_t)protocol;

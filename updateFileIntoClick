@@ -1,6 +1,7 @@
 #!/bin/bash
 cp local/*.cc ~/click/elements/local/ -u
 cp local/*.hh ~/click/elements/local/ -u
+cp elements/*.click ~/elements/ -u
 cd ~/click/
 make elemlist
 make

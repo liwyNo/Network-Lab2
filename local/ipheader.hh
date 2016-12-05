@@ -17,8 +17,8 @@ struct ipheader{
     unsigned DesIP;
     ipheader(){}
     void initialize(uint8_t ptc = 6, uint32_t src = 0, uint32_t des = 0){
-        Version = 4;
-        IHL = IPHEADERSIZE;
+        Version = 4; //IPv4
+        IHL = 5; //indicates a length of 5 × 32 bits = 160 bits = 20 bytes.
         TTL = 255;
         Protocol = ptc;
         SrcIP = src;
