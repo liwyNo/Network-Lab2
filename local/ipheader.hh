@@ -16,7 +16,7 @@ struct ipheader{
     unsigned SrcIP;
     unsigned DesIP;
     ipheader(){}
-    void initialize(uint16_t ptc = 6, uint32_t src = 0, uint32_t des = 0){
+    void initialize(uint8_t ptc = 6, uint32_t src = 0, uint32_t des = 0){
         Version = 4;
         IHL = IPHEADERSIZE;
         TTL = 255;
