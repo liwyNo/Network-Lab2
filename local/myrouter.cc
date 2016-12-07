@@ -249,7 +249,7 @@ int MyRouter::dijkstra(unsigned des){
 		if(*x == des)
 			return nb[des].port;
 		vis[*x] = true;
-		for(std::set<unsigned>::iterator y = v_map[*y].begin(); y != v_map[*y].end(); ++y){
+		for(std::set<unsigned>::iterator y = v_map[*x].begin(); y != v_map[*x].end(); ++y){
 			_nb.push(*x);
 			_point.push(*y);
 		}
