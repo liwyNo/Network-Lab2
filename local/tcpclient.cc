@@ -209,6 +209,8 @@ void TcpClient::push(int port, Packet *packet)
 			}
 			else if(rec_header -> Flag == FIN)
 			{
+				cur = Packet::make(0, buf, bufoffset, 0);
+				output(0).push(cur);
 				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
 				cur_header -> initialize();
