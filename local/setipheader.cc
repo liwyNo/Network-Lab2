@@ -27,6 +27,10 @@ uint16_t SetIPHeader::GetIpChk(unsigned char *ptr, int size)
 	int index = 0;
 	while(index < size)
 	{
+        if(index == 10){
+            index += 2;
+            continue;
+        }
 		cksum += *(ptr + index + 1);
 		cksum += *(ptr + index) << 8;
 		index += 2;
