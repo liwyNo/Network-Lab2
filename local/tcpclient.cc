@@ -306,3 +306,6 @@ void TcpClient::run_timer(Timer *timer)
 			state = CLOSED;
 	}
 }
+
+CLICK_ENDDECLS
+EXPORT_ELEMENT(TcpClient)
