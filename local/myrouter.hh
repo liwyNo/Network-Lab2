@@ -18,6 +18,8 @@ private:
 	Timer _timer;
 	unsigned ip;
 	unsigned current_loop;
+
+	std::map<unsigned, unsigned> dijk_map;
 	
 public:
 	MyRouter();

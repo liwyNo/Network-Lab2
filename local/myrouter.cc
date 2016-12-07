@@ -202,6 +202,7 @@ void MyRouter::updateRouteTable(int new_nb){
 	v_map[ip].insert(new_nb);
 	v_map[new_nb] = std::set<unsigned>();
 	v_map[new_nb].insert(ip);
+	dijk_map.clear();
 	netSize++;
 	TellRouteTable();
 }
@@ -225,6 +226,7 @@ void MyRouter::mergeRouteTable(Packet* p){
 	newSize /= 2;
 	if(newSize != netSize){
 		netSize = newSize;
+		dijk_map.clear();
 		TellRouteTable();
 	}
 	netSize = newSize;
@@ -232,7 +234,10 @@ void MyRouter::mergeRouteTable(Packet* p){
 void MyRouter::route(Packet * p){
 	ipheader * ip_h = (ipheader*)p->data();
 	unsigned des = ip_h->DesIP;
-	int _port = dijkstra(des);
+	int _port;
+	if(dijk_map.find(des) == dijk_map.end())
+		dijk_map[des] = dijkstra(des);
+	_port = dijk_map[des];
 	if(_port == -1){
 		p->kill();
         return;
@@ -240,6 +245,7 @@ void MyRouter::route(Packet * p){
 	output(_port).push(p);
 }
 int MyRouter::dijkstra(unsigned des){
+	//actually I wirte a BFS
 	std::queue<unsigned> _nb;
 	std::queue<unsigned> _point;
 	std::map<unsigned, bool> vis;
