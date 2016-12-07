@@ -31,11 +31,11 @@ int TcpClient::configure(Vector<String> &conf, ErrorHandler *errh)
 	return 0;
 }
 
-uint16_t TcpClient::gettcpchk(unsigned char *ptr, int size)
+uint16_t TcpClient::gettcpchk(const unsigned char *ptr, int size)
 {
 	int cksum = 0;
 	int index = 0;
-	while(index < size)
+	while(index < size - sizeof(short))
 	{
 		cksum += *(ptr + index + 1);
 		cksum += *(ptr + index) << 8;
@@ -93,7 +93,7 @@ void TcpClient::push(int port, Packet *packet)
 	{
 		int len = packet -> length();
 		buf = new char[len];
-		strcpy(buf, packet -> data());
+		strcpy(buf, (const char*)packet -> data());
 		if(state == CLOSED) 
 		{
 			cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
@@ -124,7 +124,7 @@ void TcpClient::push(int port, Packet *packet)
 				settcpheader(cur_header, ins, rec_header -> SeqNum + 1, 0, SYN_ACK); // SYN_ACK
 				click_chatter("Sent SYN_ACK!\n");
 				output(1).push(cur);
-				state = SYN_RCVD;
+				state = SYN_RECEIVED;
 				_timer1.schedule_after_sec(2);
 			}
 			else
@@ -146,7 +146,8 @@ void TcpClient::push(int port, Packet *packet)
 				output(1).push(cur);
 				state = ESTABLISHED;
 				bufoffset = 0;
-				senddata(bufoffset);
+				//senddata(bufoffset);
+				senddata();
 				click_chatter("ESTABLISHED!\n");
 				_timer1.schedule_after_sec(2);
 			}
@@ -156,7 +157,7 @@ void TcpClient::push(int port, Packet *packet)
 				packet -> kill();
 			}
 		}
-		else if(state == SYN_RCVD)
+		else if(state == SYN_RECEIVED)
 		{
 			if(rec_header -> Flag == ACK && rec_header -> AckNum == ins + 1)
 			{
@@ -188,7 +189,7 @@ void TcpClient::push(int port, Packet *packet)
 				{
 					buf = new char[len + packet -> length() - TCPHEADERSIZE];
 				}
-				strcpy(buf + len, packet -> data() + TCPHEADERSIZE);
+				strcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE);
 			}
 			else if(rec_header -> Flag == ACK && rec_header -> Offset == bufoffset)
 			{

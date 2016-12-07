@@ -18,7 +18,7 @@
 #define TIMED_WAIT 7
 #define CLOSE_WAIT 8
 #define LAST_ACK 9
-#define CLOSED 10
+//#define CLOSED 10
 
 #define SYN 1
 #define ACK 2
@@ -46,14 +46,15 @@ public:
 	~TcpClient();
 
 	const char *class_name() const { return "TcpClient"; }
-	const char *port_count() const { return "x/x"; }
+	const char *port_count() const { return "2/2"; }
 
 	int configure(Vector<String>&, ErrorHandler*);
 	void push(int port, Packet *);
 	void run_timer(Timer *timer);
 	void settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t o, uint8_t f);
-	uint16_t gettcpchk(unsigned char *ptr, int size);
-	void TcpClient::senddata(int offset);
+	uint16_t gettcpchk(const unsigned char *ptr, int size);
+	void senddata();
+	//void senddata(int offset);
 };
 
 CLICK_ENDDECLS
