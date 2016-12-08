@@ -6,6 +6,8 @@
 #include "tcpheader.hh"
 #include <cstdio>
 #include <cstring>
+#include <stdlib.h>
+#include <sys/stat.h>
 CLICK_DECLS
 
 TcpClient::TcpClient() : _timer1(this), _timer2(this)
@@ -64,11 +66,11 @@ void TcpClient::senddata()
 	int len = strlen(buf) - bufoffset;
 	if(len < MSS)
 	{
-		cur = Packet::make(0, buf, len, 0);
+		cur = Packet::make(0, buf + bufoffset, len, 0);
 		cur = cur -> push(TCPHEADERSIZE);
 		tcpheader *tcp_header = (tcpheader *)(cur -> data());
 		//tcp_header -> initialize();
-		settcpheader(tcp_header, ins, 0, 0, PSH); 
+		settcpheader(tcp_header, ins, 0, bufoffset, PSH); 
 		click_chatter("Sent DATA!\n");
 		bufoffset += len;
                 delete []buf;
@@ -93,10 +95,19 @@ void TcpClient::push(int port, Packet *packet)
 {
 	if(port == 0) // raw data
 	{
-		int len = packet -> length();
+		FILE* infile = fopen((const char*)packet -> data(), "rb");
+		if(!infile)
+		{
+			click_chatter("Can not open the file!\n");
+			return;
+		}
+		struct stat info;
+		stat((const char*)packet -> data(), &info);
+		int len = info.st_size;
 		buf = new char[len];
-		strcpy(buf, (const char*)packet -> data());
-		click_chatter("%s\n, buf");
+		fread(buf, sizeof(char), len, infile);
+		fclose(infile);
+		click_chatter("%s\n", buf);
 		if(state == CLOSED) 
 		{
 			cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
@@ -222,6 +233,11 @@ void TcpClient::push(int port, Packet *packet)
 			}
 			else if(rec_header -> Flag == FIN)
 			{
+				FILE* outfile;
+				outfile = fopen("/home/comnetsii/test/outfile.txt", "wb");
+				fwrite(buf, sizeof(char), bufoffset, outfile);
+				//fwrite(buf, sizeof(char), bufoffset, stdout); 
+				fclose(outfile);
 				cur = Packet::make(0, buf, bufoffset, 0);
 				output(0).push(cur);
 				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
