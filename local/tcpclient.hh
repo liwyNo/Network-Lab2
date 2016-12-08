@@ -6,7 +6,7 @@
 #include "tcpheader.hh"
 
 #define MAXSENDCNT 5
-#define MSS 1<<10
+#define MSS 10
 
 #define CLOSED 0
 #define SYN_SENT 1
