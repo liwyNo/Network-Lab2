@@ -7,7 +7,6 @@
 #include <cstdio>
 #include <cstring>
 #include <stdlib.h>
-#include <sys/stat.h>
 CLICK_DECLS
 
 TcpClient::TcpClient() : _timer1(this), _timer2(this)
@@ -73,8 +72,8 @@ void TcpClient::senddata()
 		settcpheader(tcp_header, ins, 0, bufoffset, PSH); 
 		click_chatter("Sent DATA!\n");
 		bufoffset += len;
-                delete []buf;
-                buf = NULL;
+		delete []buf;
+		buf = NULL;
 		 _timer1.schedule_after_sec(2);
 		output(1).push(cur);
 	}
@@ -95,18 +94,9 @@ void TcpClient::push(int port, Packet *packet)
 {
 	if(port == 0) // raw data
 	{
-		FILE* infile = fopen((const char*)packet -> data(), "rb");
-		if(!infile)
-		{
-			click_chatter("Can not open the file!\n");
-			return;
-		}
-		struct stat info;
-		stat((const char*)packet -> data(), &info);
-		int len = info.st_size;
+		int len = packet -> length();
 		buf = new char[len];
-		fread(buf, sizeof(char), len, infile);
-		fclose(infile);
+		strcpy(buf, (const char*)packet -> data());
 		click_chatter("%s\n", buf);
 		if(state == CLOSED) 
 		{
@@ -116,7 +106,7 @@ void TcpClient::push(int port, Packet *packet)
 			settcpheader(tcp_header, ins, 0, 0, SYN); // SYN
 			click_chatter("Sent SYN!\n");
 			state = SYN_SENT;
-                        _timer1.schedule_after_sec(2);
+			_timer1.schedule_after_sec(2);
 			output(1).push(cur);
 		}
 	}
@@ -142,7 +132,7 @@ void TcpClient::push(int port, Packet *packet)
 				settcpheader(cur_header, ins, rec_header -> SeqNum + 1, 0, SYN_ACK); // SYN_ACK
 				click_chatter("Sent SYN_ACK!\n");
 				state = SYN_RECEIVED;
-                                _timer1.schedule_after_sec(2);
+				_timer1.schedule_after_sec(2);
 				output(1).push(cur);
 			}
 			else
@@ -162,7 +152,7 @@ void TcpClient::push(int port, Packet *packet)
 				settcpheader(cur_header, ins + 1, rec_header -> SeqNum + 1, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				state = ESTABLISHED;
-                                bufoffset = 0;
+				bufoffset = 0;
 				click_chatter("ESTABLISHED!\n");
 				output(1).push(cur);
 				senddata();
@@ -227,17 +217,12 @@ void TcpClient::push(int port, Packet *packet)
 					settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 					click_chatter("Sent FIN!\n");
 					state = FIN_WAIT1;
-                                        _timer2.schedule_after_sec(1);
+					_timer2.schedule_after_sec(1);
 					output(1).push(cur);
 				}
 			}
 			else if(rec_header -> Flag == FIN)
 			{
-				FILE* outfile;
-				outfile = fopen("/home/comnetsii/test/outfile.txt", "wb");
-				fwrite(buf, sizeof(char), bufoffset, outfile);
-				//fwrite(buf, sizeof(char), bufoffset, stdout); 
-				fclose(outfile);
 				cur = Packet::make(0, buf, bufoffset, 0);
 				output(0).push(cur);
 				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
@@ -246,7 +231,7 @@ void TcpClient::push(int port, Packet *packet)
 				settcpheader(cur_header, 0, 0, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				state = CLOSE_WAIT;
-                                _timer2.schedule_after_sec(1);
+				_timer2.schedule_after_sec(1);
 				output(1).push(cur);
 			}
 			else
@@ -293,7 +278,7 @@ void TcpClient::push(int port, Packet *packet)
 				settcpheader(cur_header, 0, 0, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				state = TIMED_WAIT;
-                                _timer2.schedule_after_sec(1);
+				_timer2.schedule_after_sec(1);
 				output(1).push(cur);
 			}
 			else
@@ -332,7 +317,7 @@ void TcpClient::run_timer(Timer *timer)
 			settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 			click_chatter("Sent FIN!\n");
 			 state = LAST_ACK;
-                        _timer1.schedule_after_sec(2);
+			 _timer1.schedule_after_sec(2);
 			output(1).push(cur);
 		}
 		else if(state == TIMED_WAIT)
