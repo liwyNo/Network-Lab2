@@ -24,7 +24,7 @@ TcpClient::~TcpClient()
 
 int TcpClient::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	if(cp_va_kparse(conf, this, errh, "INS", cpkM, cpUnsigned, &ins) < 0)
+	if(cp_va_kparse(conf, this, errh, "INS", cpkM, cpUnsigned, &ins, cpEnd) < 0)
 		return -1;
 	_timer1.initialize(this);
 	_timer2.initialize(this);
@@ -35,7 +35,7 @@ uint16_t TcpClient::gettcpchk(const unsigned char *ptr, int size)
 {
 	int cksum = 0;
 	int index = 0;
-	while(index < size - sizeof(short))
+	while(index < size - (int)sizeof(short))
 	{
 		cksum += *(ptr + index + 1);
 		cksum += *(ptr + index) << 8;
@@ -55,6 +55,7 @@ void TcpClient::settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t 
 	header -> AckNum = a;
 	header -> Offset = o;
 	header -> Flag = f;
+	header -> Checksum = 0;
 	header -> Checksum = gettcpchk(cur -> data(), TCPHEADERSIZE);
 }
 
@@ -66,7 +67,7 @@ void TcpClient::senddata()
 		cur = Packet::make(0, buf, len, 0);
 		cur = cur -> push(TCPHEADERSIZE);
 		tcpheader *tcp_header = (tcpheader *)(cur -> data());
-		tcp_header -> initialize();
+		//tcp_header -> initialize();
 		settcpheader(tcp_header, ins, 0, 0, PSH); 
 		click_chatter("Sent DATA!\n");
 		output(1).push(cur);
@@ -79,7 +80,7 @@ void TcpClient::senddata()
 		cur = Packet::make(0, buf + bufoffset, MSS, 0);
 		cur = cur -> push(TCPHEADERSIZE);
 		tcpheader *tcp_header = (tcpheader *)(cur -> data());
-		tcp_header -> initialize();
+		//tcp_header -> initialize();
 		settcpheader(tcp_header, ins, 0, bufoffset, PSH); 
 		click_chatter("Sent DATA!\n");
 		output(1).push(cur);
@@ -98,7 +99,7 @@ void TcpClient::push(int port, Packet *packet)
 		{
 			cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 			tcpheader *tcp_header = (tcpheader *)(cur -> data());
-			tcp_header -> initialize();
+			//tcp_header -> initialize();
 			settcpheader(tcp_header, ins, 0, 0, SYN); // SYN
 			click_chatter("Sent SYN!\n");
 			output(1).push(cur);
@@ -108,19 +109,23 @@ void TcpClient::push(int port, Packet *packet)
 	}
 	else
 	{
+		click_chatter("Received Packet!\n");
 		tcpheader *rec_header = (tcpheader *)(packet -> data());
-		if(gettcpchk(packet -> data(), TCPHEADERSIZE) != 0)
+		click_chatter("seq: %d ack: %d offset: %d flag: %d checksum: %d get: %d\n", rec_header -> SeqNum, rec_header -> AckNum, rec_header -> Offset, rec_header -> Flag, rec_header -> Checksum, gettcpchk(packet -> data(), TCPHEADERSIZE));
+		if(gettcpchk(packet -> data(), TCPHEADERSIZE) != rec_header -> Checksum)
 		{
 			packet -> kill();
+			click_chatter("Wrong checksum!");
 			return;
 		}
 		if(state == CLOSED)
 		{
 			if(rec_header -> Flag == SYN)
 			{
+				click_chatter("Received SYN!\n");
 				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
-				cur_header -> initialize();
+				//cur_header -> initialize();
 				settcpheader(cur_header, ins, rec_header -> SeqNum + 1, 0, SYN_ACK); // SYN_ACK
 				click_chatter("Sent SYN_ACK!\n");
 				output(1).push(cur);
@@ -140,7 +145,7 @@ void TcpClient::push(int port, Packet *packet)
 				_timer1.unschedule();
 				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
-				cur_header -> initialize();
+				//cur_header -> initialize();
 				settcpheader(cur_header, ins + 1, rec_header -> SeqNum + 1, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				output(1).push(cur);
@@ -199,7 +204,7 @@ void TcpClient::push(int port, Packet *packet)
 				{
 					cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 					tcpheader *cur_header = (tcpheader *)(cur -> data());
-					cur_header -> initialize();
+					//cur_header -> initialize();
 					settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 					click_chatter("Sent FIN!\n");
 					output(1).push(cur);
@@ -213,7 +218,7 @@ void TcpClient::push(int port, Packet *packet)
 				output(0).push(cur);
 				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
-				cur_header -> initialize();
+				//cur_header -> initialize();
 				settcpheader(cur_header, 0, 0, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				output(1).push(cur);
@@ -259,7 +264,7 @@ void TcpClient::push(int port, Packet *packet)
 			{
 				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
-				cur_header -> initialize();
+				//cur_header -> initialize();
 				settcpheader(cur_header, 0, 0, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				output(1).push(cur);
@@ -279,7 +284,7 @@ void TcpClient::run_timer(Timer *timer)
 {
 	if(timer == &_timer1) 
 	{
-		click_chatter("timer fired at state: %d\n", &state);
+		click_chatter("timer fired at state: %d\n", state);
 		if(sendcnt == MAXSENDCNT) 
 		{
 			cur -> kill();
@@ -287,7 +292,7 @@ void TcpClient::run_timer(Timer *timer)
 		}
 		else
 		{
-			output(1).push(cur);
+			output(1).push(cur -> clone());
 			++sendcnt;
 			_timer1.reschedule_after_sec(2);
 		}
@@ -298,7 +303,7 @@ void TcpClient::run_timer(Timer *timer)
 		{
 			cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
 			tcpheader *cur_header = (tcpheader *)(cur -> data());
-			cur_header -> initialize();
+			//cur_header -> initialize();
 			settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 			click_chatter("Sent FIN!\n");
 			output(1).push(cur);
