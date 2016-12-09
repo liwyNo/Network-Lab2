@@ -8,7 +8,7 @@
 #include <cstring>
 #include <stdlib.h>
 CLICK_DECLS
-
+#define click_chatter(x, ...)
 TcpClient::TcpClient() : _timer1(this), _timer2(this)
 {
 	state = CLOSED;
@@ -65,7 +65,7 @@ void TcpClient::senddata()
 	int len = strlen(buf) - bufoffset;
 	if(len < MSS)
 	{
-		cur = Packet::make(0, buf + bufoffset, len, 0);
+		cur = Packet::make(buf + bufoffset, len);
 		cur = cur -> push(TCPHEADERSIZE);
 		tcpheader *tcp_header = (tcpheader *)(cur -> data());
 		//tcp_header -> initialize();
@@ -75,11 +75,11 @@ void TcpClient::senddata()
 		delete []buf;
 		buf = NULL;
 		 _timer1.schedule_after_sec(2);
-		output(1).push(cur);
+		output(1).push(cur->clone());
 	}
 	else
 	{
-		cur = Packet::make(0, buf + bufoffset, MSS, 0);
+		cur = Packet::make(buf + bufoffset, MSS);
 		cur = cur -> push(TCPHEADERSIZE);
 		tcpheader *tcp_header = (tcpheader *)(cur -> data());
 		//tcp_header -> initialize();
@@ -87,7 +87,7 @@ void TcpClient::senddata()
 		click_chatter("Sent DATA!\n");
 		bufoffset += MSS;
 		 _timer1.schedule_after_sec(2);
-		output(1).push(cur);
+		output(1).push(cur->clone());
 	}
 }
 void TcpClient::push(int port, Packet *packet)
@@ -100,14 +100,14 @@ void TcpClient::push(int port, Packet *packet)
 		click_chatter("%s\n", buf);
 		if(state == CLOSED) 
 		{
-			cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+			cur = Packet::make(TCPHEADERSIZE);
 			tcpheader *tcp_header = (tcpheader *)(cur -> data());
 			//tcp_header -> initialize();
 			settcpheader(tcp_header, ins, 0, 0, SYN); // SYN
 			click_chatter("Sent SYN!\n");
 			state = SYN_SENT;
 			_timer1.schedule_after_sec(2);
-			output(1).push(cur);
+			output(1).push(cur->clone());
 		}
 	}
 	else
@@ -126,18 +126,18 @@ void TcpClient::push(int port, Packet *packet)
 			if(rec_header -> Flag == SYN)
 			{
 				click_chatter("Received SYN!\n");
-				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+				cur = Packet::make(TCPHEADERSIZE);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
 				//cur_header -> initialize();
 				settcpheader(cur_header, ins, rec_header -> SeqNum + 1, 0, SYN_ACK); // SYN_ACK
 				click_chatter("Sent SYN_ACK!\n");
 				state = SYN_RECEIVED;
 				_timer1.schedule_after_sec(2);
-				output(1).push(cur);
+				output(1).push(cur->clone());
 			}
 			else
 			{
-				click_chatter("Received wrong packet!\n");
+				click_chatter("Received wrong packet! State CLOSE.\n");
 				packet -> kill();
 			}
 		}
@@ -146,7 +146,7 @@ void TcpClient::push(int port, Packet *packet)
 			if(rec_header -> Flag == SYN_ACK && rec_header -> AckNum == ins + 1)
 			{
 				_timer1.unschedule();
-				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+				cur = Packet::make(TCPHEADERSIZE);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
 				//cur_header -> initialize();
 				settcpheader(cur_header, ins + 1, rec_header -> SeqNum + 1, 0, ACK); // ACK
@@ -154,12 +154,12 @@ void TcpClient::push(int port, Packet *packet)
 				state = ESTABLISHED;
 				bufoffset = 0;
 				click_chatter("ESTABLISHED!\n");
-				output(1).push(cur);
+				output(1).push(cur->clone());
 				senddata();
 			}
 			else
 			{
-				click_chatter("Received wrong packet!\n");
+				click_chatter("Received wrong packet! State SYN_SENT.\n");
 				packet -> kill();
 			}
 		}
@@ -173,7 +173,7 @@ void TcpClient::push(int port, Packet *packet)
 			}
 			else
 			{
-				click_chatter("Received wrong packet!\n");
+				click_chatter("Received wrong packet! State SYN_RECEIVED.\n");
 				packet -> kill();
 			}
 		}
@@ -198,11 +198,11 @@ void TcpClient::push(int port, Packet *packet)
 				strcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE);
 				click_chatter("%s\n", buf);
 				bufoffset += packet -> length() - TCPHEADERSIZE;
-				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+				cur = Packet::make(TCPHEADERSIZE);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
 				settcpheader(cur_header, 0, 0, bufoffset, ACK);
 				click_chatter("Sent ACK!\n");
-				output(1).push(cur);
+				output(1).push(cur->clone());
 			}
 			else if(rec_header -> Flag == ACK && rec_header -> Offset == bufoffset)
 			{
@@ -211,32 +211,32 @@ void TcpClient::push(int port, Packet *packet)
 					senddata();
 				else
 				{
-					cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+					cur = Packet::make(TCPHEADERSIZE);
 					tcpheader *cur_header = (tcpheader *)(cur -> data());
 					//cur_header -> initialize();
 					settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 					click_chatter("Sent FIN!\n");
 					state = FIN_WAIT1;
 					_timer2.schedule_after_sec(1);
-					output(1).push(cur);
+					output(1).push(cur->clone());
 				}
 			}
 			else if(rec_header -> Flag == FIN)
 			{
-				cur = Packet::make(0, buf, bufoffset, 0);
-				output(0).push(cur);
-				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+				cur = Packet::make(buf, bufoffset);
+				output(0).push(cur->clone());
+				cur = Packet::make(TCPHEADERSIZE);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
 				//cur_header -> initialize();
 				settcpheader(cur_header, 0, 0, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				state = CLOSE_WAIT;
 				_timer2.schedule_after_sec(1);
-				output(1).push(cur);
+				output(1).push(cur->clone());
 			}
 			else
 			{
-				click_chatter("Received wrong packet!\n");
+				click_chatter("Received wrong packet! State ESTABLISHED.\n");
 				packet -> kill();
 			}
 		}
@@ -245,12 +245,16 @@ void TcpClient::push(int port, Packet *packet)
 			if(rec_header -> Flag == ACK)
 			{
 				_timer1.unschedule();
-				state = CLOSED;
+	            state = CLOSED;
+	            sendcnt = 0;
+	            buf = NULL;
+	            bufoffset = 0;
+				//state = CLOSED;
 				click_chatter("Closed! ins: %d\n", ins);
 			}
 			else
 			{
-				click_chatter("Received wrong packet!\n");
+				click_chatter("Received wrong packet! State LAST_ACK.\n");
 				packet -> kill();
 			}
 		}
@@ -263,7 +267,7 @@ void TcpClient::push(int port, Packet *packet)
 			}
 			else
 			{
-				click_chatter("Received wrong packet!\n");
+				click_chatter("Received wrong packet! State FIN_WAIT1.\n");
 				packet -> kill();
 			}
 		}
@@ -272,18 +276,18 @@ void TcpClient::push(int port, Packet *packet)
 			//tcpheader *rec_header = (tcpheader *)(packet -> data());
 			if(rec_header -> Flag == FIN)
 			{
-				cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+				cur = Packet::make(TCPHEADERSIZE);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
 				//cur_header -> initialize();
 				settcpheader(cur_header, 0, 0, 0, ACK); // ACK
 				click_chatter("Sent ACK!\n");
 				state = TIMED_WAIT;
 				_timer2.schedule_after_sec(1);
-				output(1).push(cur);
+				output(1).push(cur->clone());
 			}
 			else
 			{
-				click_chatter("Received wrong packet!\n");
+				click_chatter("Received wrong packet! State FIN_WAIT2.\n");
 				packet -> kill();
 			}
 		}
@@ -298,6 +302,8 @@ void TcpClient::run_timer(Timer *timer)
 		if(sendcnt == MAXSENDCNT) 
 		{
 			cur -> kill();
+            //state = CLOSED;
+            //sendcnt = 0;
 			click_chatter("cannot send a packet! connection closed\n");
 		}
 		else
@@ -311,14 +317,14 @@ void TcpClient::run_timer(Timer *timer)
 	{
 		if(state == CLOSE_WAIT)
 		{
-			cur = Packet::make(0, 0, TCPHEADERSIZE, 0);
+			cur = Packet::make(TCPHEADERSIZE);
 			tcpheader *cur_header = (tcpheader *)(cur -> data());
 			//cur_header -> initialize();
 			settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 			click_chatter("Sent FIN!\n");
 			 state = LAST_ACK;
 			 _timer1.schedule_after_sec(2);
-			output(1).push(cur);
+			output(1).push(cur -> clone());
 		}
 		else if(state == TIMED_WAIT)
 		{	

@@ -72,6 +72,7 @@ void MyRouter::push(int port, Packet * p){
 			//from lower layer to upper layer
 			if(ip_h->DesIP == ip){
 				//packet to me!!!!
+                p = p->uniqueify();
 				p->pull(sizeof(ipheader));
 				output(0).push(p);	
 				return;
@@ -239,7 +240,7 @@ void MyRouter::route(Packet * p){
 		dijk_map[des] = dijkstra(des);
 	_port = dijk_map[des];
 	if(_port == -1){
-		p->kill();
+		//p->kill();
         return;
     }
 	output(_port).push(p);
