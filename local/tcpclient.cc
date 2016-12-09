@@ -8,7 +8,7 @@
 #include <cstring>
 #include <stdlib.h>
 CLICK_DECLS
-#define click_chatter(x, ...)
+//#define click_chatter(x, ...)
 TcpClient::TcpClient() : _timer1(this), _timer2(this)
 {
 	state = CLOSED;
@@ -97,7 +97,6 @@ void TcpClient::push(int port, Packet *packet)
 		int len = packet -> length();
 		buf = new char[len];
 		strcpy(buf, (const char*)packet -> data());
-		click_chatter("%s\n", buf);
 		if(state == CLOSED) 
 		{
 			cur = Packet::make(TCPHEADERSIZE);
@@ -179,7 +178,21 @@ void TcpClient::push(int port, Packet *packet)
 		}
 		else if(state == ESTABLISHED) 
 		{
-			if(rec_header -> Flag == PSH && rec_header -> Offset == bufoffset)
+			if(rec_header -> Flag == SYN_ACK && rec_header -> AckNum == ins + 1)
+			{
+				//_timer1.unschedule();
+				cur = Packet::make(TCPHEADERSIZE);
+				tcpheader *cur_header = (tcpheader *)(cur -> data());
+				//cur_header -> initialize();
+				settcpheader(cur_header, ins + 1, rec_header -> SeqNum + 1, 0, ACK); // ACK
+				click_chatter("Sent ACK!\n");
+				state = ESTABLISHED;
+				bufoffset = 0;
+				click_chatter("ESTABLISHED!\n");
+				output(1).push(cur->clone());
+				senddata();
+			}
+            else if(rec_header -> Flag == PSH && rec_header -> Offset == bufoffset)
 			{
 				int len = 0;
 				if(buf != NULL)
@@ -196,7 +209,6 @@ void TcpClient::push(int port, Packet *packet)
 					buf = new char[len + packet -> length() - TCPHEADERSIZE];
 				}
 				strcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE);
-				click_chatter("%s\n", buf);
 				bufoffset += packet -> length() - TCPHEADERSIZE;
 				cur = Packet::make(TCPHEADERSIZE);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
@@ -215,7 +227,7 @@ void TcpClient::push(int port, Packet *packet)
 					tcpheader *cur_header = (tcpheader *)(cur -> data());
 					//cur_header -> initialize();
 					settcpheader(cur_header, 0, 0, 0, FIN); // FIN
-					click_chatter("Sent FIN!\n");
+					click_chatter("Sent FIN! And Chang to FIN_WAIT1\n");
 					state = FIN_WAIT1;
 					_timer2.schedule_after_sec(1);
 					output(1).push(cur->clone());
@@ -302,8 +314,10 @@ void TcpClient::run_timer(Timer *timer)
 		if(sendcnt == MAXSENDCNT) 
 		{
 			cur -> kill();
-            //state = CLOSED;
-            //sendcnt = 0;
+	        state = CLOSED;
+	        sendcnt = 0;
+	        buf = NULL;
+	        bufoffset = 0;
 			click_chatter("cannot send a packet! connection closed\n");
 		}
 		else
