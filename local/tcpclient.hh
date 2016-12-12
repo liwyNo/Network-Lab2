@@ -7,6 +7,7 @@
 
 #define MAXSENDCNT 7
 #define MSS 10
+#define RECV_BUFSIZE 100
 
 #define CLOSED 0
 #define SYN_SENT 1
@@ -39,9 +40,12 @@ private:
 	unsigned ins;
 	char *buf;
 	int bufoffset;
+	int window;
 	//int bufnum;
 	WritablePacket *cur;
 	int sendcnt;
+	int filelen;
+	int datasentup;
 	Timer _timer1;
 	Timer _timer2;
 	
@@ -60,7 +64,7 @@ public:
 	int initialize(ErrorHandler*);
 	void push(int port, Packet *);
 	void run_timer(Timer *timer);
-	void settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t o, uint8_t f);
+	void settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t o, uint8_t f, unsigned);
 	uint16_t gettcpchk(const unsigned char *ptr, int size);
 	void senddata();
 	//void senddata(int offset);

@@ -20,6 +20,8 @@ TcpClient::TcpClient() : _timer1(this), _timer2(this)
 	buf = NULL;
 	bufoffset = 0;
 	bc = false;
+	window = MSS;
+	datasentup = 0;
 }
 
 TcpClient::~TcpClient()
@@ -68,13 +70,14 @@ uint16_t TcpClient::gettcpchk(const unsigned char *ptr, int size)
 	return (uint16_t)cksum;
 }
 
-void TcpClient::settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t o, uint8_t f)
+void TcpClient::settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t o, uint8_t f, unsigned w = 0)
 {
 	header -> SeqNum = s;
 	header -> AckNum = a;
 	header -> Offset = o;
 	header -> Flag = f;
 	header -> Checksum = 0;
+	header -> Winsize = w;
 	header -> src_port = src_port;
 	header -> des_port = des_port;
 	header -> Checksum = gettcpchk(cur -> data(), TCPHEADERSIZE);
@@ -82,8 +85,24 @@ void TcpClient::settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t 
 
 void TcpClient::senddata()
 {
-	int len = strlen(buf) - bufoffset;
-	if(len < MSS)
+	int len = filelen - bufoffset;
+	int length = len < MSS ? len : MSS;
+	length = length < window ? length : window;
+	cur = Packet::make(buf + bufoffset, length);
+	cur = cur -> push(TCPHEADERSIZE);
+	tcpheader *tcp_header = (tcpheader *)(cur -> data());
+	settcpheader(tcp_header, ins, 0, bufoffset, PSH); 
+	click_chatter("Sent DATA!\n");
+	bufoffset += length;
+	sendcnt = 0;
+	if(length == len)
+	{
+		delete []buf;
+		buf = NULL;
+	}
+	 _timer1.schedule_after_sec(PACKET_TIMEOUT);
+	output(1).push(cur->clone());
+	/*if(len < MSS)
 	{
 		cur = Packet::make(buf + bufoffset, len);
 		cur = cur -> push(TCPHEADERSIZE);
@@ -110,13 +129,14 @@ void TcpClient::senddata()
 		sendcnt = 0;
 		 _timer1.schedule_after_sec(PACKET_TIMEOUT);
 		output(1).push(cur->clone());
-	}
+	}*/
 }
 void TcpClient::push(int port, Packet *packet)
 {
 	if(port == 0) // raw data
 	{
 		int len = packet -> length();
+		filelen = len;
 		buf = new char[len];
 		memcpy(buf, (const char*)packet -> data(), len);
 		if(state == CLOSED) 
@@ -219,26 +239,38 @@ void TcpClient::push(int port, Packet *packet)
 			}
             else if(rec_header -> Flag == PSH)
 			{
-				if(rec_header -> Offset == bufoffset % 256){
-					int len = 0;
+				if(rec_header -> Offset == (bufoffset + datasentup) % 256)
+				{
+					/*int len = 0;
 					if(buf != NULL)
 					{
 						len = strlen(buf);
 						char *tmp = new char[len];
-						memcpy(tmp, buf, len);
+						strcpy(tmp, buf);
 						buf = new char[len + packet -> length() - TCPHEADERSIZE];
-						memcpy(buf, tmp,len);
+						strcpy(buf, tmp);
 						delete []tmp;
 					}
 					else
 					{
 						buf = new char[len + packet -> length() - TCPHEADERSIZE];
-					}
-					memcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE,packet -> length() - TCPHEADERSIZE);
+					}*/
+					if(buf == NULL)
+						buf = new char[RECV_BUFSIZE];
+					memcpy(buf + bufoffset, (const char*)packet -> data() + TCPHEADERSIZE, packet->length() - TCPHEADERSIZE);
 					bufoffset += packet -> length() - TCPHEADERSIZE;
+					if(bufoffset == RECV_BUFSIZE)
+					{
+						cur = Packet::make(buf, bufoffset);
+						datasentup += bufoffset;
+						output(0).push(cur->clone());
+						delete []buf;
+						buf = new char[RECV_BUFSIZE];
+						bufoffset = 0;
+					}
 					cur = Packet::make(TCPHEADERSIZE);
 					tcpheader *cur_header = (tcpheader *)(cur -> data());
-					settcpheader(cur_header, 0, 0, bufoffset, ACK);
+					settcpheader(cur_header, 0, 0, bufoffset + datasentup, ACK, RECV_BUFSIZE - bufoffset);
 					click_chatter("Sent ACK!\n");
 					output(1).push(cur->clone());
 				}
@@ -252,7 +284,10 @@ void TcpClient::push(int port, Packet *packet)
 			{
 				_timer1.unschedule();
 				if(buf != NULL)
+				{
 					senddata();
+					window = rec_header -> Winsize; 
+				}
 				else
 				{
 					cur = Packet::make(TCPHEADERSIZE);
@@ -268,8 +303,10 @@ void TcpClient::push(int port, Packet *packet)
 			}
 			else if(rec_header -> Flag == FIN)
 			{
-				cur = Packet::make(buf, bufoffset);
-				output(0).push(cur->clone());
+				if(bufoffset != 0){
+					cur = Packet::make(buf, bufoffset);
+					output(0).push(cur->clone());
+				}
 				cur = Packet::make(TCPHEADERSIZE);
 				tcpheader *cur_header = (tcpheader *)(cur -> data());
 				//cur_header -> initialize();
@@ -308,6 +345,8 @@ void TcpClient::push(int port, Packet *packet)
 				delete[] buf;
 	            buf = NULL;
 	            bufoffset = 0;
+				window = MSS;
+				datasentup = 0;
 				//state = CLOSED;
 				click_chatter("Closed! ins: %d\n", ins);
 			}
@@ -366,6 +405,8 @@ void TcpClient::run_timer(Timer *timer)
 			delete [] buf;
 	        buf = NULL;
 	        bufoffset = 0;
+			window = MSS;
+			datasentup = 0;
 			click_chatter("cannot send a packet! connection closed\n");
 		}
 		else
