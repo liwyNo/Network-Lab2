@@ -10,18 +10,10 @@ rp2 -> [1]r2[1] ->rp2
 
 tcp1::TcpClient(INS 5);
 tcp2::TcpClient(INS 20);
-file::FileApp();
-RatedSource(DATA "/home/comnetsii/test/infile.txt", RATE 1, LIMIT 1)
-						-> [0] file [0] 
-						-> [0] tcp1 [1]
-                        -> Print(From1, -1)
-						-> SetIPHeader(SOURCE_IP 1, DEST_IP 2)
-                        -> [0] r1 [0]
-                        -> Print(TO1)
-                        -> [1] tcp1 [0]
-                        -> Discard
+file::FileApp(SEND "/home/comnetsii/test/infile.txt", RECV "/home/comnetsii/test/outfile.txt");
+file [0] -> [0] tcp1 [1] -> Print(From1, -1) -> SetIPHeader(SOURCE_IP 1, DEST_IP 2) -> [0] r1 [0] -> Print(TO1) -> [1] tcp1 [0] -> Discard
 
-tcp2[1] -> Print(From2) -> SetIPHeader(SOURCE_IP 2, DEST_IP 1) -> [0]r2[0] -> Print(TO2) -> [1] tcp2 [0] -> [1] file [1] -> Discard
+tcp2[1] -> Print(From2) -> SetIPHeader(SOURCE_IP 2, DEST_IP 1) -> [0]r2[0] -> Print(TO2) -> [1] tcp2 [0] -> [0] file
 
  
 FromDevice(veth3) ->  [0] tcp2

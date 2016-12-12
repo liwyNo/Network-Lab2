@@ -74,7 +74,8 @@ void TcpClient::senddata()
 		bufoffset += len;
 		delete []buf;
 		buf = NULL;
-		 _timer1.schedule_after_sec(2);
+		sendcnt = 0;
+		 _timer1.schedule_after_sec(PACKET_TIMEOUT);
 		output(1).push(cur->clone());
 	}
 	else
@@ -86,7 +87,8 @@ void TcpClient::senddata()
 		settcpheader(tcp_header, ins, 0, bufoffset, PSH); 
 		click_chatter("Sent DATA!\n");
 		bufoffset += MSS;
-		 _timer1.schedule_after_sec(2);
+		sendcnt = 0;
+		 _timer1.schedule_after_sec(PACKET_TIMEOUT);
 		output(1).push(cur->clone());
 	}
 }
@@ -105,7 +107,8 @@ void TcpClient::push(int port, Packet *packet)
 			settcpheader(tcp_header, ins, 0, 0, SYN); // SYN
 			click_chatter("Sent SYN!\n");
 			state = SYN_SENT;
-			_timer1.schedule_after_sec(2);
+			sendcnt = 0;
+			_timer1.schedule_after_sec(PACKET_TIMEOUT);
 			output(1).push(cur->clone());
 		}
 	}
@@ -131,7 +134,8 @@ void TcpClient::push(int port, Packet *packet)
 				settcpheader(cur_header, ins, rec_header -> SeqNum + 1, 0, SYN_ACK); // SYN_ACK
 				click_chatter("Sent SYN_ACK!\n");
 				state = SYN_RECEIVED;
-				_timer1.schedule_after_sec(2);
+				sendcnt = 0;
+				_timer1.schedule_after_sec(PACKET_TIMEOUT);
 				output(1).push(cur->clone());
 			}
 			else
@@ -168,6 +172,7 @@ void TcpClient::push(int port, Packet *packet)
 			{
 				_timer1.unschedule();
 				state = ESTABLISHED;
+				bufoffset = 0;
 				click_chatter("ESTABLISHED!\n");
 			}
 			else
@@ -192,29 +197,36 @@ void TcpClient::push(int port, Packet *packet)
 				output(1).push(cur->clone());
 				senddata();
 			}
-            else if(rec_header -> Flag == PSH && rec_header -> Offset == bufoffset)
+            else if(rec_header -> Flag == PSH)
 			{
-				int len = 0;
-				if(buf != NULL)
-				{
-					len = strlen(buf);
-					char *tmp = new char[len];
-					strcpy(tmp, buf);
-					buf = new char[len + packet -> length() - TCPHEADERSIZE];
-					strcpy(buf, tmp);
-					delete []tmp;
+				if(rec_header -> Offset == bufoffset){
+					int len = 0;
+					if(buf != NULL)
+					{
+						len = strlen(buf);
+						char *tmp = new char[len];
+						strcpy(tmp, buf);
+						buf = new char[len + packet -> length() - TCPHEADERSIZE];
+						strcpy(buf, tmp);
+						delete []tmp;
+					}
+					else
+					{
+						buf = new char[len + packet -> length() - TCPHEADERSIZE];
+					}
+					strcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE);
+					bufoffset += packet -> length() - TCPHEADERSIZE;
+					cur = Packet::make(TCPHEADERSIZE);
+					tcpheader *cur_header = (tcpheader *)(cur -> data());
+					settcpheader(cur_header, 0, 0, bufoffset, ACK);
+					click_chatter("Sent ACK!\n");
+					output(1).push(cur->clone());
 				}
-				else
-				{
-					buf = new char[len + packet -> length() - TCPHEADERSIZE];
+				else{
+					click_chatter("ESTABLISHED State. Resend ACK!\n");
+					output(1).push(cur -> clone());
+					
 				}
-				strcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE);
-				bufoffset += packet -> length() - TCPHEADERSIZE;
-				cur = Packet::make(TCPHEADERSIZE);
-				tcpheader *cur_header = (tcpheader *)(cur -> data());
-				settcpheader(cur_header, 0, 0, bufoffset, ACK);
-				click_chatter("Sent ACK!\n");
-				output(1).push(cur->clone());
 			}
 			else if(rec_header -> Flag == ACK && rec_header -> Offset == bufoffset)
 			{
@@ -229,7 +241,8 @@ void TcpClient::push(int port, Packet *packet)
 					settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 					click_chatter("Sent FIN! And Chang to FIN_WAIT1\n");
 					state = FIN_WAIT1;
-					_timer2.schedule_after_sec(1);
+					sendcnt = 0;
+					_timer1.schedule_after_sec(1);
 					output(1).push(cur->clone());
 				}
 			}
@@ -254,7 +267,20 @@ void TcpClient::push(int port, Packet *packet)
 		}
 		else if(state == LAST_ACK)
 		{
-			if(rec_header -> Flag == ACK)
+			if(rec_header -> Flag == FIN){
+				_timer2.unschedule();
+				cur = Packet::make(buf, bufoffset);
+				output(0).push(cur->clone());
+				cur = Packet::make(TCPHEADERSIZE);
+				tcpheader *cur_header = (tcpheader *)(cur -> data());
+				//cur_header -> initialize();
+				settcpheader(cur_header, 0, 0, 0, ACK); // ACK
+				click_chatter("Sent ACK!\n");
+				state = CLOSE_WAIT;
+				_timer2.schedule_after_sec(1);
+				output(1).push(cur->clone());				
+			}
+			else if(rec_header -> Flag == ACK)
 			{
 				_timer1.unschedule();
 	            state = CLOSED;
@@ -336,12 +362,19 @@ void TcpClient::run_timer(Timer *timer)
 			//cur_header -> initialize();
 			settcpheader(cur_header, 0, 0, 0, FIN); // FIN
 			click_chatter("Sent FIN!\n");
-			 state = LAST_ACK;
-			 _timer1.schedule_after_sec(2);
+			state = LAST_ACK;
+			sendcnt = 0;
+			_timer1.schedule_after_sec(PACKET_TIMEOUT);
 			output(1).push(cur -> clone());
+			
+			_timer2.schedule_after_sec(CONNECT_TIMEOUT);
 		}
 		else if(state == TIMED_WAIT)
 		{	
+			state = CLOSED;
+			click_chatter("Closed! ins: %d\n", ins);
+		}
+		else if(state == LAST_ACK){
 			state = CLOSED;
 			click_chatter("Closed! ins: %d\n", ins);
 		}

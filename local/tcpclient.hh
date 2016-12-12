@@ -5,7 +5,7 @@
 #include <click/timer.hh>
 #include "tcpheader.hh"
 
-#define MAXSENDCNT 5
+#define MAXSENDCNT 7
 #define MSS 10
 
 #define CLOSED 0
@@ -26,6 +26,9 @@
 #define PSH 4
 #define FIN 5
 #define RST 6
+
+#define PACKET_TIMEOUT 2
+#define CONNECT_TIMEOUT 5
 
 CLICK_DECLS
 
