@@ -1,4 +1,5 @@
 require(library "/home/comnetsii/elements/lossyrouterport.click")
+require(library "/home/comnetsii/elements/routerport.click")
 
 rp1 :: RouterPort(DEV veth1, IN_MAC 7a:e0:da:e5:63:fc, OUT_MAC 7e:c7:04:76:58:e9)
 rp2 :: LossyRouterPort(DEV veth2, IN_MAC 7e:c7:04:76:58:e9, OUT_MAC 7a:e0:da:e5:63:fc,LOSS 0.95, DELAY 0)
