@@ -44,6 +44,11 @@ private:
 	int sendcnt;
 	Timer _timer1;
 	Timer _timer2;
+	
+	unsigned src_port;
+	unsigned des_port;
+	
+	bool bc;
 public:
 	TcpClient();
 	~TcpClient();

@@ -20,10 +20,14 @@ r5 :: MyRouter(IP 5)
 r6 :: MyRouter(IP 6)
 r7 :: MyRouter(IP 7)
 
-tcp1 :: TcpClient(INS 10)
-//tcp2 :: TcpClient(INS 20)
-tcp3 :: TcpClient(INS 30)
+tcp1 :: TcpClient(INS 10, SRC_PORT 22, DES_PORT 22, BROADCAST true)
+tcp2 :: TcpClient(INS 20, SRC_PORT 22, DES_PORT 22, BROADCAST true)
+tcp3 :: TcpClient(INS 30, SRC_PORT 23, DES_PORT 23, BROADCAST true)
+tcp4 :: TcpClient(INS 40, SRC_PORT 23, DES_PORT 23, BROADCAST true)
 
+tcpl1 :: TCPRouter()
+tcpl2 :: TCPRouter()
+tcpl3 :: TCPRouter()
 rp1->[1]r1[1]->rp1
 rp2->[1]r2[1]->rp2
 rp3->[2]r2[2]->rp3
@@ -41,12 +45,15 @@ InfiniteSource(ACTIVE false)->[0]r2[0]->Discard
 InfiniteSource(ACTIVE false)->[0]r3[0]->Discard
 InfiniteSource(ACTIVE false)->[0]r5[0]->Discard
 InfiniteSource(ACTIVE false)->[0]r6[0]->Discard
-InfiniteSource(ACTIVE false)->[0]r4[0]->Discard
-InfiniteSource(ACTIVE false)->[0]tcp3[1]->SetIPHeader(SOURCE_IP 7, DEST_IP 1) -> [0]r7[0]->[1]tcp3[0]->Print(LABEL "TO7", MAXLENGTH -1, CONTENTS ASCII)->Discard
+InfiniteSource(ACTIVE false)->[0]tcp3[1]->SetIPHeader(SOURCE_IP 4, DEST_IP 1) -> [1]tcpl2[0] -> [0]r4[0] -> [0] tcpl2 [1]->[1]tcp3[0]->Print(LABEL "TO4", MAXLENGTH -1, CONTENTS ASCII)->Discard
+InfiniteSource(ACTIVE false)->[0]tcp2[1]->SetIPHeader(SOURCE_IP 7, DEST_IP 1) -> [1]tcpl3[0] -> [0]r7[0] -> [0] tcpl3 [1]->[1]tcp2[0]->Print(LABEL "TO7", MAXLENGTH -1, CONTENTS ASCII)->Discard
 
 //RatedSource(DATA "Client1ToClient7", RATE 1) -> [0]tcp1[1] -> SetIPHeader(SOURCE_IP 1, DEST_IP 7) -> [0]r1[0] -> [1]tcp1[0] -> Print(LABEL "TO1", MAXLENGTH -1, CONTENTS ASCII) -> Discard
 //RatedSource(DATA "Client4ToClient7", RATE 1) -> [0]tcp2[1] -> SetIPHeader(SOURCE_IP 4, DEST_IP 7) -> [0]r4[0] -> [1]tcp2[0] -> Print(LABEL "TO7", MAXLENGTH -1, CONTENTS ASCII) -> Discard
 //RatedSource(DATA "Client7ToClient1", RATE 1) -> [0]tcp3[1] -> SetIPHeader(SOURCE_IP 7, DEST_IP 1) -> [0]r7[0] -> [1]tcp3[0] -> Print(LABEL "TO1", MAXLENGTH -1, CONTENTS ASCII) -> Discard
-RatedSource(DATA "Client1ToClient7", RATE 1) -> [0]tcp1[1] -> SetIPHeader(SOURCE_IP 1, DEST_IP 7) -> [0]r1[0] -> [1]tcp1[0] -> Print(LABEL "TO1", MAXLENGTH -1, CONTENTS ASCII) -> Discard
+RatedSource(DATA "Client1ToClient7", RATE 1) -> [0]tcp1[1] -> SetIPHeader(SOURCE_IP 1, DEST_IP 7) -> [1]tcpl1[0] -> [0]r1[0] -> [0]tcpl1[1] -> [1]tcp1[0] -> Print(LABEL "4TO1", MAXLENGTH -1, CONTENTS ASCII) -> Discard
+RatedSource(DATA "Client1ToClient4", RATE 1) -> [0]tcp4[1] -> SetIPHeader(SOURCE_IP 1, DEST_IP 4) -> [2]tcpl1
+	tcpl1[2] -> [1]tcp4[0] -> Print(LABEL "7TO1", MAXLENGTH -1, CONTENTS ASCII) -> Discard
+
 //RatedSource(DATA "Client4ToClient7", RATE 1) -> [0]tcp2[1] -> SetIPHeader(SOURCE_IP 4, DEST_IP 7) -> [0]r4[0] -> Print(LABEL "TO4", MAXLENGTH -1, CONTENTS ASCII) -> Discard
 //RatedSource(DATA "Client7ToClient1", RATE 1) -> [0]tcp3[1] -> SetIPHeader(SOURCE_IP 7, DEST_IP 1) -> [0]r7[0] -> Print(LABEL "TO7", MAXLENGTH -1, CONTENTS ASCII) -> Discard

@@ -4,6 +4,8 @@
 
 struct tcpheader
 {
+	unsigned short src_port;
+	unsigned short des_port;
 	unsigned SeqNum;
 	unsigned AckNum;
 	unsigned Offset: 8;

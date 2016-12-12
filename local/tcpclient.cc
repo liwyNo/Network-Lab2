@@ -9,12 +9,17 @@
 #include <stdlib.h>
 CLICK_DECLS
 //#define click_chatter(x, ...)
+struct pair_port{
+	unsigned short src;
+	unsigned short des;
+};
 TcpClient::TcpClient() : _timer1(this), _timer2(this)
 {
 	state = CLOSED;
 	sendcnt = 0;
 	buf = NULL;
 	bufoffset = 0;
+	bc = false;
 }
 
 TcpClient::~TcpClient()
@@ -25,10 +30,22 @@ TcpClient::~TcpClient()
 
 int TcpClient::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	if(cp_va_kparse(conf, this, errh, "INS", cpkM, cpUnsigned, &ins, cpEnd) < 0)
+	if(cp_va_kparse(conf, this, errh, 
+		"INS", cpkM, cpUnsigned, &ins,
+		"SRC_PORT", cpkM, cpUnsigned, &src_port,
+		"DES_PORT", cpkM, cpUnsigned, &des_port,
+		"BROADCAST",0, cpBool, &bc,
+		cpEnd) < 0)
 		return -1;
 	_timer1.initialize(this);
 	_timer2.initialize(this);
+	if(bc){
+		pair_port pp;
+		pp.src = src_port;
+		pp.des = des_port;
+		WritablePacket * p = Packet::make((char*)&pp, 4);
+		output(1).push(p);
+	}
 	return 0;
 }
 
@@ -57,6 +74,8 @@ void TcpClient::settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t 
 	header -> Offset = o;
 	header -> Flag = f;
 	header -> Checksum = 0;
+	header -> src_port = src_port;
+	header -> des_port = des_port;
 	header -> Checksum = gettcpchk(cur -> data(), TCPHEADERSIZE);
 }
 
