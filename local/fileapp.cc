@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 CLICK_DECLS
 
-FileApp::FileApp()
+FileApp::FileApp():timer1(this)
 {}
 
 FileApp::~FileApp()
@@ -23,7 +23,8 @@ int FileApp::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("RECV", recvfile)
 	.complete() < 0)
 	return -1;
-	
+	timer1.initialize(this);
+	timer1.schedule_after_sec(1);
 	if(recvfile != "")
 		if(ninputs() != 1){
 			click_chatter("Error: 1 output unused.\n");
@@ -34,9 +35,11 @@ int FileApp::configure(Vector<String> &conf, ErrorHandler *errh)
 			click_chatter("Error: 1 input unused.\n");
 			return -1;
 		}
-		send();
 	}
 	return 0;
+}
+void FileApp::run_timer(Timer * timer){
+	send();
 }
 void FileApp::send(){
 	FILE* infile = fopen(sendfile.c_str(), "rb");

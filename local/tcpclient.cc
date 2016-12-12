@@ -27,7 +27,10 @@ TcpClient::~TcpClient()
 	if(buf != NULL)
 		delete []buf;
 }
-
+int TcpClient::initialize(ErrorHandler*){
+	_timer1.initialize(this);
+	_timer2.initialize(this);
+}
 int TcpClient::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	if(cp_va_kparse(conf, this, errh, 
@@ -37,8 +40,6 @@ int TcpClient::configure(Vector<String> &conf, ErrorHandler *errh)
 		"BROADCAST",0, cpBool, &bc,
 		cpEnd) < 0)
 		return -1;
-	_timer1.initialize(this);
-	_timer2.initialize(this);
 	if(bc){
 		pair_port pp;
 		pp.src = src_port;
@@ -117,7 +118,7 @@ void TcpClient::push(int port, Packet *packet)
 	{
 		int len = packet -> length();
 		buf = new char[len];
-		strcpy(buf, (const char*)packet -> data());
+		memcpy(buf, (const char*)packet -> data(), len);
 		if(state == CLOSED) 
 		{
 			cur = Packet::make(TCPHEADERSIZE);
@@ -218,22 +219,22 @@ void TcpClient::push(int port, Packet *packet)
 			}
             else if(rec_header -> Flag == PSH)
 			{
-				if(rec_header -> Offset == bufoffset){
+				if(rec_header -> Offset == bufoffset % 256){
 					int len = 0;
 					if(buf != NULL)
 					{
 						len = strlen(buf);
 						char *tmp = new char[len];
-						strcpy(tmp, buf);
+						memcpy(tmp, buf, len);
 						buf = new char[len + packet -> length() - TCPHEADERSIZE];
-						strcpy(buf, tmp);
+						memcpy(buf, tmp,len);
 						delete []tmp;
 					}
 					else
 					{
 						buf = new char[len + packet -> length() - TCPHEADERSIZE];
 					}
-					strcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE);
+					memcpy(buf + len, (const char*)packet -> data() + TCPHEADERSIZE,packet -> length() - TCPHEADERSIZE);
 					bufoffset += packet -> length() - TCPHEADERSIZE;
 					cur = Packet::make(TCPHEADERSIZE);
 					tcpheader *cur_header = (tcpheader *)(cur -> data());
@@ -247,7 +248,7 @@ void TcpClient::push(int port, Packet *packet)
 					
 				}
 			}
-			else if(rec_header -> Flag == ACK && rec_header -> Offset == bufoffset)
+			else if(rec_header -> Flag == ACK && rec_header -> Offset == bufoffset % 256)
 			{
 				_timer1.unschedule();
 				if(buf != NULL)
@@ -304,6 +305,7 @@ void TcpClient::push(int port, Packet *packet)
 				_timer1.unschedule();
 	            state = CLOSED;
 	            sendcnt = 0;
+				delete[] buf;
 	            buf = NULL;
 	            bufoffset = 0;
 				//state = CLOSED;
@@ -361,6 +363,7 @@ void TcpClient::run_timer(Timer *timer)
 			cur -> kill();
 	        state = CLOSED;
 	        sendcnt = 0;
+			delete [] buf;
 	        buf = NULL;
 	        bufoffset = 0;
 			click_chatter("cannot send a packet! connection closed\n");

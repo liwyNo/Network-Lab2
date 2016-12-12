@@ -10,6 +10,7 @@ class FileApp : public Element
 {
 private:
 	String sendfile, recvfile;
+	Timer timer1;
 public:
 	FileApp();
 	~FileApp();
@@ -20,6 +21,7 @@ public:
 	int configure(Vector<String>&, ErrorHandler*);
 	void push(int port, Packet *);
 	void send();
+	void run_timer(Timer * timer);
 };
 
 CLICK_ENDDECLS

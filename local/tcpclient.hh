@@ -57,6 +57,7 @@ public:
 	const char *port_count() const { return "2/2"; }
 
 	int configure(Vector<String>&, ErrorHandler*);
+	int initialize(ErrorHandler*);
 	void push(int port, Packet *);
 	void run_timer(Timer *timer);
 	void settcpheader(tcpheader* header, unsigned s, unsigned a, uint8_t o, uint8_t f);
